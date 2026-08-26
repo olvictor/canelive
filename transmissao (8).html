@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CONSOLE // Transmissão de Tela</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14171a;
+    --panel:#1d2226;
+    --panel-2:#22282d;
+    --hairline:#33393f;
+    --text:#e8e6e1;
+    --text-dim:#8b9199;
+    --red:#e63946;
+    --red-dim:#5c2229;
+    --amber:#f2a541;
+    --green:#4cae6d;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 15% 10%, #1a2024 0%, transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Mono', monospace;
+    min-height:100vh;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:32px 16px 60px;
+  }
+  .console{
+    width:100%;
+    max-width:880px;
+    background:var(--panel);
+    border:1px solid var(--hairline);
+    border-radius:6px;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.6);
+    overflow:hidden;
+  }
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:18px 22px;
+    border-bottom:1px solid var(--hairline);
+    background:
+      linear-gradient(180deg, #20262b, #1d2226);
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .brand h1{
+    font-family:'Archivo Black', sans-serif;
+    font-size:15px;
+    letter-spacing:.12em;
+    margin:0;
+    color:var(--text);
+  }
+  .brand small{
+    display:block;
+    color:var(--text-dim);
+    font-size:10px;
+    letter-spacing:.15em;
+    margin-top:2px;
+  }
+  .onair{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 14px;
+    border-radius:3px;
+    border:1px solid var(--hairline);
+    background:var(--red-dim);
+    color:#7a3a41;
+    font-family:'Archivo Black', sans-serif;
+    font-size:11px;
+    letter-spacing:.18em;
+    transition:all .25s ease;
+  }
+  .onair .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:#7a3a41;
+    transition:all .25s ease;
+  }
+  .onair.live{
+    background:var(--red);
+    color:#fff;
+    box-shadow:0 0 18px 2px rgba(230,57,70,.55);
+  }
+  .onair.live .dot{
+    background:#fff;
+    box-shadow:0 0 10px 3px rgba(255,255,255,.8);
+    animation:pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1;} 50%{opacity:.35;}
+  }
+
+  .tabs{
+    display:flex;
+    border-bottom:1px solid var(--hairline);
+  }
+  .tab{
+    flex:1;
+    padding:14px;
+    text-align:center;
+    background:var(--panel);
+    border:none;
+    border-right:1px solid var(--hairline);
+    color:var(--text-dim);
+    font-family:'Archivo Black', sans-serif;
+    font-size:12px;
+    letter-spacing:.14em;
+    cursor:pointer;
+  }
+  .tab:last-child{border-right:none;}
+  .tab.active{
+    background:var(--panel-2);
+    color:var(--text);
+    box-shadow:inset 0 -2px 0 var(--amber);
+  }
+
+  .body{padding:22px;}
+  .panel-section{display:none;}
+  .panel-section.active{display:block;}
+
+  .freq{
+    background:#0f1214;
+    border:1px solid var(--hairline);
+    border-radius:4px;
+    padding:14px 16px;
+    margin-bottom:18px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .freq label{
+    font-size:10px;
+    letter-spacing:.14em;
+    color:var(--text-dim);
+    display:block;
+    margin-bottom:4px;
+  }
+  .freq .id-value{
+    font-size:20px;
+    font-weight:700;
+    color:var(--amber);
+    letter-spacing:.06em;
+    word-break:break-all;
+  }
+  .copy-btn{
+    background:var(--panel-2);
+    border:1px solid var(--hairline);
+    color:var(--text);
+    font-family:inherit;
+    font-size:11px;
+    padding:8px 12px;
+    border-radius:3px;
+    cursor:pointer;
+    letter-spacing:.08em;
+  }
+  .copy-btn:hover{border-color:var(--amber);}
+
+  video{
+    width:100%;
+    border-radius:4px;
+    background:#000;
+    border:1px solid var(--hairline);
+    display:block;
+    aspect-ratio:16/9;
+    object-fit:contain;
+  }
+
+  .controls{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-top:16px;
+  }
+  @media (max-width:560px){ .controls{grid-template-columns:1fr;} }
+
+  .field label{
+    font-size:10px;
+    letter-spacing:.12em;
+    color:var(--text-dim);
+    display:flex;
+    justify-content:space-between;
+  }
+  .field input[type=range]{
+    width:100%;
+    accent-color:var(--amber);
+    margin-top:8px;
+  }
+  .toggle-row{
+    display:flex;
+    border:1px solid var(--hairline);
+    border-radius:3px;
+    overflow:hidden;
+    margin-top:8px;
+  }
+  .toggle-row button{
+    flex:1;
+    background:var(--panel-2);
+    color:var(--text-dim);
+    border:none;
+    padding:9px;
+    font-family:inherit;
+    font-size:11px;
+    letter-spacing:.06em;
+    cursor:pointer;
+    border-right:1px solid var(--hairline);
+  }
+  .toggle-row button:last-child{border-right:none;}
+  .toggle-row button.active{
+    background:var(--amber);
+    color:#1c1204;
+    font-weight:600;
+  }
+
+  .row{display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+  input[type=text]{
+    flex:1;
+    min-width:180px;
+    background:#0f1214;
+    border:1px solid var(--hairline);
+    color:var(--text);
+    padding:11px 12px;
+    border-radius:3px;
+    font-family:inherit;
+    font-size:13px;
+  }
+  input[type=text]:focus{outline:none;border-color:var(--amber);}
+  .btn{
+    background:var(--red);
+    border:none;
+    color:#fff;
+    padding:11px 18px;
+    border-radius:3px;
+    font-family:'Archivo Black', sans-serif;
+    font-size:11px;
+    letter-spacing:.1em;
+    cursor:pointer;
+  }
+  .btn:disabled{background:#3a3f43; cursor:not-allowed; color:var(--text-dim);}
+  .btn.secondary{background:var(--panel-2); border:1px solid var(--hairline); color:var(--text);}
+
+  .vu{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-top:16px;
+  }
+  .vu .cell{
+    background:#0f1214;
+    border:1px solid var(--hairline);
+    border-radius:4px;
+    padding:10px 12px;
+  }
+  .vu .cell label{
+    font-size:9px;
+    letter-spacing:.12em;
+    color:var(--text-dim);
+    display:block;
+  }
+  .vu .cell .val{
+    font-size:18px;
+    font-weight:700;
+    margin-top:4px;
+  }
+  .val.good{color:var(--green);}
+  .val.warn{color:var(--amber);}
+  .val.bad{color:var(--red);}
+
+  .hint{
+    font-size:11px;
+    color:var(--text-dim);
+    line-height:1.6;
+    margin-top:16px;
+    border-top:1px solid var(--hairline);
+    padding-top:14px;
+  }
+  .hint b{color:var(--text);}
+</style>
+</head>
+<body>
+
+<div class="console">
+  <div class="topbar">
+    <div class="brand">
+      <h1>CONSOLE // TX</h1>
+      <small>transmissão de tela via webrtc — ponto a ponto</small>
+    </div>
+    <div class="onair" id="onairLamp"><span class="dot"></span><span id="onairText">OFF AIR</span></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="tx">TRANSMITIR</button>
+    <button class="tab" data-tab="rx">ASSISTIR</button>
+  </div>
+
+  <div class="body">
+
+    <!-- TRANSMITTER -->
+    <div class="panel-section active" id="panel-tx">
+      <div class="freq">
+        <div>
+          <label>SEU ID (envie para quem vai assistir)</label>
+          <div class="id-value" id="myId">gerando...</div>
+        </div>
+        <button class="copy-btn" id="copyId">COPIAR</button>
+      </div>
+
+      <video id="localVideo" muted playsinline autoplay></video>
+
+      <div class="row" style="margin-top:14px;">
+        <button class="btn" id="startShare">INICIAR TRANSMISSÃO</button>
+        <button class="btn secondary" id="stopShare" disabled>PARAR</button>
+      </div>
+
+      <div class="controls">
+        <div class="field">
+          <label><span>BITRATE MÁXIMO</span><span id="bitrateVal">8 Mbps</span></label>
+          <input type="range" id="bitrate" min="1" max="20" value="8" step="1">
+        </div>
+        <div class="field">
+          <label>PRIORIDADE</label>
+          <div class="toggle-row">
+            <button class="active" data-mode="quality">QUALIDADE</button>
+            <button data-mode="latency">VELOCIDADE</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hint">
+        <b>Qualidade</b> mantém a resolução cheia e deixa o fps cair se a rede apertar (melhor para texto/planilhas).
+        <b>Velocidade</b> mantém o fps e reduz a resolução se precisar (melhor para jogos/vídeo, delay mais baixo).
+        Viewers conectados: <span id="viewerCount">0</span>.
+      </div>
+    </div>
+
+    <!-- VIEWER -->
+    <div class="panel-section" id="panel-rx">
+      <div class="row">
+        <input type="text" id="remoteId" placeholder="Cole aqui o ID de quem está transmitindo">
+        <button class="btn" id="connectBtn">CONECTAR</button>
+      </div>
+      <div class="hint" id="iceStatus" style="border-top:none; padding-top:0; margin-top:-6px;">status ICE: aguardando...</div>
+      <div class="hint" id="streamStatus" style="border-top:none; padding-top:0; margin-top:-6px;">status vídeo: aguardando...</div>
+
+      <video id="remoteVideo" playsinline autoplay></video>
+      <button class="btn secondary" id="unmuteBtn" style="display:none; margin-top:10px;">ATIVAR SOM</button>
+
+      <div class="vu">
+        <div class="cell"><label>LATÊNCIA (RTT)</label><div class="val" id="statRtt">—</div></div>
+        <div class="cell"><label>BITRATE</label><div class="val" id="statBitrate">—</div></div>
+        <div class="cell"><label>RESOLUÇÃO / FPS</label><div class="val" id="statRes">—</div></div>
+      </div>
+
+      <div class="hint">
+        Se não conectar, geralmente é NAT/firewall restritivo — sinalização (achar o outro peer) funciona,
+        mas o tráfego de vídeo em si não consegue furar a rede sem um <b>servidor TURN</b>. Testar antes na
+        mesma rede Wi-Fi já confirma se o resto da configuração está certo.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
+  // ---------- shared peer setup ----------
+  const peer = new Peer(undefined, {
+    debug: 1,
+    config: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:openrelay.metered.ca:80" },
+        { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+      ]
+    }
+  });
+
+  peer.on('open', id => {
+    document.getElementById('myId').textContent = id;
+  });
+  peer.on('error', err => {
+    console.error('Peer error:', err);
+  });
+
+  // ---------- tabs ----------
+  document.querySelectorAll('.tab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel-section').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  document.getElementById('copyId').addEventListener('click', ()=>{
+    navigator.clipboard.writeText(document.getElementById('myId').textContent);
+    const b = document.getElementById('copyId');
+    b.textContent = 'COPIADO';
+    setTimeout(()=> b.textContent = 'COPIAR', 1200);
+  });
+
+  // ---------- TRANSMITTER ----------
+  let localStream = null;
+  let activeSenders = []; // RTCRtpSender[] across all viewer connections
+  let mode = 'quality';
+  let bitrateMbps = 8;
+  let viewerCount = 0;
+
+  const onairLamp = document.getElementById('onairLamp');
+  const onairText = document.getElementById('onairText');
+
+  function setOnAir(live){
+    onairLamp.classList.toggle('live', live);
+    onairText.textContent = live ? 'ON AIR' : 'OFF AIR';
+  }
+
+  document.getElementById('bitrate').addEventListener('input', e=>{
+    bitrateMbps = Number(e.target.value);
+    document.getElementById('bitrateVal').textContent = bitrateMbps + ' Mbps';
+    applySenderParams();
+  });
+
+  document.querySelectorAll('.toggle-row [data-mode]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.toggle-row [data-mode]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      mode = btn.dataset.mode;
+      applySenderParams();
+    });
+  });
+
+  async function applySenderParams(){
+    for (const sender of activeSenders){
+      if (!sender.track || sender.track.kind !== 'video') continue;
+      const params = sender.getParameters();
+      if (!params.encodings) params.encodings = [{}];
+      params.encodings[0].maxBitrate = bitrateMbps * 1_000_000;
+      params.degradationPreference = mode === 'quality' ? 'maintain-resolution' : 'maintain-framerate';
+      try { await sender.setParameters(params); } catch(e){ console.warn(e); }
+    }
+  }
+
+  document.getElementById('startShare').addEventListener('click', async ()=>{
+    try{
+      localStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          width:  { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 60, max: 60 }
+        },
+        audio: true
+      });
+    }catch(e){
+      alert('Não foi possível capturar a tela: ' + e.message);
+      return;
+    }
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('localVideo').play().catch(()=>{});
+    document.getElementById('startShare').disabled = true;
+    document.getElementById('stopShare').disabled = false;
+    setOnAir(true);
+
+    localStream.getVideoTracks()[0].addEventListener('ended', stopSharing);
+
+    pendingViewers.forEach(viewerId => callViewer(viewerId));
+    pendingViewers.clear();
+  });
+
+  document.getElementById('stopShare').addEventListener('click', stopSharing);
+
+  function stopSharing(){
+    if (localStream) localStream.getTracks().forEach(t=>t.stop());
+    localStream = null;
+    document.getElementById('localVideo').srcObject = null;
+    document.getElementById('startShare').disabled = false;
+    document.getElementById('stopShare').disabled = true;
+    setOnAir(false);
+  }
+
+  const callsByViewer = new Map();  // viewerPeerId -> MediaConnection
+  const pendingViewers = new Set(); // viewers who asked before sharing started
+
+  function callViewer(viewerId){
+    if (!localStream) return;
+
+    const existing = callsByViewer.get(viewerId);
+    if (existing){ try { existing.close(); } catch(e){} }
+
+    const call = peer.call(viewerId, localStream);
+    callsByViewer.set(viewerId, call);
+
+    viewerCount++;
+    document.getElementById('viewerCount').textContent = viewerCount;
+
+    call.peerConnection.getSenders().forEach(s=>{
+      if (s.track) activeSenders.push(s);
+    });
+    applySenderParams();
+
+    const cleanup = ()=>{
+      if (callsByViewer.get(viewerId) === call) callsByViewer.delete(viewerId);
+      viewerCount = Math.max(0, viewerCount-1);
+      document.getElementById('viewerCount').textContent = viewerCount;
+    };
+    call.on('close', cleanup);
+    call.on('error', err => { console.warn('Erro na chamada com viewer:', err); cleanup(); });
+  }
+
+  // Viewers announce themselves via a lightweight data connection; the
+  // broadcaster (who actually owns the media tracks) always places the
+  // real WebRTC call back to them. This avoids renegotiating a call that
+  // started with an empty stream, which is unreliable.
+  peer.on('connection', conn => {
+    conn.on('open', ()=>{
+      if (localStream){
+        callViewer(conn.peer);
+      } else {
+        pendingViewers.add(conn.peer);
+        try { conn.send({type:'wait'}); } catch(e){}
+      }
+    });
+  });
+
+  document.getElementById('unmuteBtn').addEventListener('click', ()=>{
+    const v = document.getElementById('remoteVideo');
+    v.muted = false;
+    v.play().catch(()=>{});
+    document.getElementById('unmuteBtn').style.display = 'none';
+  });
+
+  // ---------- VIEWER ----------
+  let currentCall = null;
+  let currentConn = null;
+  const connectBtn = document.getElementById('connectBtn');
+
+  function resetConnectBtn(){
+    connectBtn.disabled = false;
+    connectBtn.textContent = 'CONECTAR';
+  }
+
+  function wireIncomingCall(call, iceStatusEl){
+    currentCall = call;
+
+    try { call.answer(); } catch(e){ console.warn('Falha ao responder chamada recebida:', e); return; }
+
+    if (!call.peerConnection){
+      console.warn('peerConnection ainda não disponível após answer(); tentando de novo em breve.');
+      setTimeout(()=> attachCallListeners(call, iceStatusEl), 200);
+      return;
+    }
+    attachCallListeners(call, iceStatusEl);
+  }
+
+  function attachCallListeners(call, iceStatusEl){
+    if (!call.peerConnection){
+      console.error('peerConnection nunca ficou disponível para esta chamada.');
+      return;
+    }
+
+    call.peerConnection.addEventListener('iceconnectionstatechange', ()=>{
+      const state = call.peerConnection.iceConnectionState;
+      iceStatusEl.textContent = 'status ICE: ' + state;
+      if (state === 'failed'){
+        iceStatusEl.textContent = 'status ICE: FALHOU — rede não conseguiu abrir caminho direto nem via TURN.';
+      }
+    });
+
+    call.on('stream', remoteStream => {
+      const remoteVideo = document.getElementById('remoteVideo');
+      const streamStatusEl = document.getElementById('streamStatus');
+      const nTracks = remoteStream.getTracks().length;
+      const videoTracks = remoteStream.getVideoTracks();
+      streamStatusEl.textContent = `status vídeo: stream recebido (${nTracks} tracks, ${videoTracks.length} de vídeo).`;
+
+      if (videoTracks[0]){
+        const t = videoTracks[0];
+        const logTrackState = ()=>{
+          const msg = `track de vídeo — enabled:${t.enabled} muted:${t.muted} readyState:${t.readyState}`;
+          console.log(msg);
+          streamStatusEl.textContent = 'status vídeo: ' + msg;
+        };
+        logTrackState();
+        t.addEventListener('mute', ()=>{ console.log('track MUTOU (sem dados chegando)'); logTrackState(); });
+        t.addEventListener('unmute', ()=>{ console.log('track voltou a enviar dados'); logTrackState(); });
+        t.addEventListener('ended', ()=>{ console.log('track TERMINOU'); logTrackState(); });
+      }
+
+      remoteVideo.srcObject = remoteStream;
+      remoteVideo.play().catch(err=>{
+        console.warn('Autoplay com áudio bloqueado, tentando mudo:', err);
+        remoteVideo.muted = true;
+        remoteVideo.play().catch(e2=>console.warn('Ainda falhou mudo:', e2));
+        document.getElementById('unmuteBtn').style.display = 'inline-block';
+      });
+      startStatsLoop(call.peerConnection);
+      connectBtn.textContent = 'CONECTADO';
+    });
+    call.on('close', ()=>{
+      if (currentCall === call) currentCall = null;
+      resetConnectBtn();
+    });
+    call.on('error', e => {
+      console.error('Erro na chamada recebida:', e);
+      if (currentCall === call) currentCall = null;
+      resetConnectBtn();
+    });
+  }
+
+  peer.on('call', call => {
+    const iceStatusEl = document.getElementById('iceStatus');
+    iceStatusEl.textContent = 'status ICE: recebendo chamada do transmissor...';
+    wireIncomingCall(call, iceStatusEl);
+  });
+
+  connectBtn.addEventListener('click', ()=>{
+    const remoteId = document.getElementById('remoteId').value.trim();
+    if (!remoteId || connectBtn.disabled) return;
+
+    if (currentConn){ try { currentConn.close(); } catch(e){} currentConn = null; }
+    if (currentCall){ try { currentCall.close(); } catch(e){} currentCall = null; }
+
+    connectBtn.disabled = true;
+    connectBtn.textContent = 'CONECTANDO...';
+    const iceStatusEl = document.getElementById('iceStatus');
+    iceStatusEl.textContent = 'status: avisando o transmissor...';
+
+    const conn = peer.connect(remoteId, { reliable: true });
+    currentConn = conn;
+
+    conn.on('data', data => {
+      if (data && data.type === 'wait'){
+        iceStatusEl.textContent = 'status: transmissor ainda não iniciou o compartilhamento — aguardando...';
+      }
+    });
+    conn.on('error', e => {
+      console.error('Erro ao avisar transmissor:', e);
+      iceStatusEl.textContent = 'status: erro ao conectar — ' + (e && e.message ? e.message : e);
+      resetConnectBtn();
+    });
+  });
+
+  let statsTimer = null;
+  let lastBytes = 0, lastTime = 0;
+
+  function startStatsLoop(pc){
+    if (statsTimer) clearInterval(statsTimer);
+    statsTimer = setInterval(async ()=>{
+      const stats = await pc.getStats();
+      let rtt = null, bitrateKbps = null, w=null, h=null, fps=null;
+
+      stats.forEach(report=>{
+        if (report.type === 'candidate-pair' && report.nominated && report.currentRoundTripTime !== undefined){
+          rtt = report.currentRoundTripTime * 1000;
+        }
+        if (report.type === 'inbound-rtp' && report.kind === 'video'){
+          const now = report.timestamp;
+          if (lastTime){
+            const deltaBytes = report.bytesReceived - lastBytes;
+            const deltaTime = (now - lastTime) / 1000;
+            if (deltaTime > 0) bitrateKbps = (deltaBytes * 8 / deltaTime) / 1000;
+          }
+          lastBytes = report.bytesReceived;
+          lastTime = now;
+          fps = report.framesPerSecond;
+          w = report.frameWidth;
+          h = report.frameHeight;
+        }
+      });
+
+      const rttEl = document.getElementById('statRtt');
+      if (rtt !== null){
+        rttEl.textContent = rtt.toFixed(0) + ' ms';
+        rttEl.className = 'val ' + (rtt < 80 ? 'good' : rtt < 200 ? 'warn' : 'bad');
+      }
+      if (bitrateKbps !== null){
+        document.getElementById('statBitrate').textContent = bitrateKbps > 1000
+          ? (bitrateKbps/1000).toFixed(1) + ' Mbps'
+          : bitrateKbps.toFixed(0) + ' kbps';
+      }
+      if (w && h){
+        document.getElementById('statRes').textContent = `${w}x${h} @ ${fps || '—'}fps`;
+      }
+    }, 1000);
+  }
+</script>
+</body>
+</html>
