@@ -324,6 +324,7 @@
       <div class="row" style="margin-top:14px;">
         <button class="btn" id="startShare">INICIAR TRANSMISSÃO</button>
         <button class="btn secondary" id="stopShare" disabled>PARAR</button>
+        <button class="btn secondary" id="micToggle">🎤 ATIVAR MICROFONE</button>
       </div>
 
       <div class="controls">
@@ -483,6 +484,10 @@
     document.getElementById('stopShare').disabled = false;
     setOnAir(true);
 
+    if (micStream){
+      localStream.addTrack(micStream.getAudioTracks()[0]);
+    }
+
     localStream.getVideoTracks()[0].addEventListener('ended', stopSharing);
 
     pendingViewers.forEach(viewerId => callViewer(viewerId));
@@ -498,6 +503,65 @@
     document.getElementById('startShare').disabled = false;
     document.getElementById('stopShare').disabled = true;
     setOnAir(false);
+  }
+
+  // ---------- MICROPHONE (independent toggle, off by default) ----------
+  let micStream = null;
+  const micToggleBtn = document.getElementById('micToggle');
+
+  micToggleBtn.addEventListener('click', async ()=>{
+    if (micStream){
+      disableMic();
+      return;
+    }
+    micToggleBtn.disabled = true;
+    micToggleBtn.textContent = '🎤 pedindo permissão...';
+    try{
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }catch(e){
+      alert('Não foi possível acessar o microfone: ' + e.message);
+      micStream = null;
+      micToggleBtn.disabled = false;
+      micToggleBtn.textContent = '🎤 ATIVAR MICROFONE';
+      return;
+    }
+    const micTrack = micStream.getAudioTracks()[0];
+
+    if (localStream){
+      localStream.addTrack(micTrack);
+      // Add the track to every live viewer connection — this triggers
+      // renegotiation automatically (broadcaster is the original caller,
+      // so PeerJS/WebRTC handle this cleanly).
+      callsByViewer.forEach(call => {
+        try { call.peerConnection.addTrack(micTrack, localStream); }
+        catch(e){ console.warn('Falha ao adicionar microfone à chamada:', e); }
+      });
+    }
+
+    micToggleBtn.disabled = false;
+    micToggleBtn.textContent = '🎤 DESATIVAR MICROFONE';
+
+    micTrack.addEventListener('ended', disableMic);
+  });
+
+  function disableMic(){
+    if (!micStream) return;
+    const micTrack = micStream.getAudioTracks()[0];
+
+    if (localStream && micTrack){
+      callsByViewer.forEach(call => {
+        try{
+          const sender = call.peerConnection.getSenders().find(s => s.track === micTrack);
+          if (sender) call.peerConnection.removeTrack(sender);
+        }catch(e){ console.warn('Falha ao remover microfone da chamada:', e); }
+      });
+      localStream.removeTrack(micTrack);
+    }
+
+    micStream.getTracks().forEach(t=>t.stop());
+    micStream = null;
+    micToggleBtn.disabled = false;
+    micToggleBtn.textContent = '🎤 ATIVAR MICROFONE';
   }
 
   const callsByViewer = new Map();  // viewerPeerId -> MediaConnection
