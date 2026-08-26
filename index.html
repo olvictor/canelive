@@ -634,16 +634,18 @@
         document.getElementById('unmuteBtn').style.display = 'inline-block';
       });
       startStatsLoop(call.peerConnection);
-      connectBtn.textContent = 'CONECTADO';
+      isConnected = true;
+      connectBtn.disabled = false;
+      connectBtn.textContent = 'DESCONECTAR';
     });
     call.on('close', ()=>{
       if (currentCall === call) currentCall = null;
-      resetConnectBtn();
+      handleDisconnected();
     });
     call.on('error', e => {
       console.error('Erro na chamada recebida:', e);
       if (currentCall === call) currentCall = null;
-      resetConnectBtn();
+      handleDisconnected();
     });
   }
 
@@ -653,14 +655,42 @@
     wireIncomingCall(call, iceStatusEl);
   });
 
+  let isConnected = false;
+
+  function handleDisconnected(){
+    isConnected = false;
+    if (statsTimer){ clearInterval(statsTimer); statsTimer = null; }
+    lastBytes = 0; lastTime = 0;
+    const remoteVideo = document.getElementById('remoteVideo');
+    remoteVideo.srcObject = null;
+    document.getElementById('unmuteBtn').style.display = 'none';
+    document.getElementById('statRtt').textContent = '—';
+    document.getElementById('statBitrate').textContent = '—';
+    document.getElementById('statRes').textContent = '—';
+    document.getElementById('streamStatus').textContent = 'status vídeo: desconectado.';
+    document.getElementById('iceStatus').textContent = 'status ICE: desconectado.';
+    resetConnectBtn();
+  }
+
+  function disconnectViewer(){
+    if (currentCall){ try { currentCall.close(); } catch(e){} currentCall = null; }
+    if (currentConn){ try { currentConn.close(); } catch(e){} currentConn = null; }
+    handleDisconnected();
+  }
+
   connectBtn.addEventListener('click', ()=>{
+    if (isConnected || connectBtn.textContent === 'CONECTANDO...'){
+      disconnectViewer();
+      return;
+    }
+
     const remoteId = document.getElementById('remoteId').value.trim();
-    if (!remoteId || connectBtn.disabled) return;
+    if (!remoteId) return;
 
     if (currentConn){ try { currentConn.close(); } catch(e){} currentConn = null; }
     if (currentCall){ try { currentCall.close(); } catch(e){} currentCall = null; }
 
-    connectBtn.disabled = true;
+    connectBtn.disabled = false; // stays clickable so the user can cancel
     connectBtn.textContent = 'CONECTANDO...';
     const iceStatusEl = document.getElementById('iceStatus');
     iceStatusEl.textContent = 'status: avisando o transmissor...';
@@ -676,7 +706,7 @@
     conn.on('error', e => {
       console.error('Erro ao avisar transmissor:', e);
       iceStatusEl.textContent = 'status: erro ao conectar — ' + (e && e.message ? e.message : e);
-      resetConnectBtn();
+      handleDisconnected();
     });
   });
 
