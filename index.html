@@ -386,6 +386,8 @@
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
   // ---------- shared peer setup ----------
+  const METERED_TURN_API = "https://canelalives.metered.live/api/v1/turn/credentials?apiKey=22fde5c66fe73a98c2e0856398c462000ac0";
+
   const ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
@@ -396,6 +398,26 @@
     { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
     { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
   ];
+
+  // Fetch our own dedicated TURN credentials in the background. This runs
+  // without blocking startup — the app works immediately on the public
+  // fallback list above, and gets upgraded with dedicated (more reliable)
+  // servers the moment the fetch resolves.
+  async function upgradeToDedicatedTurn(peerInstance){
+    try{
+      const resp = await fetch(METERED_TURN_API);
+      const dedicated = await resp.json();
+      if (Array.isArray(dedicated) && dedicated.length){
+        // Put dedicated servers first so they're preferred, keep the
+        // public ones after as a fallback in case the account runs out
+        // of free quota for the month.
+        peerInstance.options.config.iceServers = [...dedicated, ...ICE_SERVERS];
+        console.log('TURN dedicado (Metered) carregado com sucesso:', dedicated.length, 'servidores.');
+      }
+    }catch(e){
+      console.warn('Não foi possível buscar TURN dedicado, seguindo só com o público:', e);
+    }
+  }
 
   function createPeer(){
     const p = new Peer(undefined, {
@@ -421,6 +443,9 @@
     p.on('close', ()=>{
       console.warn('Conexão com o broker foi encerrada definitivamente.');
     });
+
+    upgradeToDedicatedTurn(p);
+
     return p;
   }
 
