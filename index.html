@@ -386,25 +386,45 @@
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
   // ---------- shared peer setup ----------
-  const peer = new Peer(undefined, {
-    debug: 1,
-    config: {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:openrelay.metered.ca:80" },
-        { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-        { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-        { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
-      ]
-    }
-  });
+  const ICE_SERVERS = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun.cloudflare.com:3478" },
+    { urls: "stun:openrelay.metered.ca:80" },
+    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+  ];
 
-  peer.on('open', id => {
-    document.getElementById('myId').textContent = id;
-  });
-  peer.on('error', err => {
-    console.error('Peer error:', err);
-  });
+  function createPeer(){
+    const p = new Peer(undefined, {
+      debug: 1,
+      config: { iceServers: ICE_SERVERS, iceCandidatePoolSize: 4 }
+    });
+
+    p.on('open', id => {
+      document.getElementById('myId').textContent = id;
+      console.log('Conectado ao broker de sinalização, ID:', id);
+    });
+    p.on('error', err => {
+      console.error('Peer error:', err);
+    });
+    // If the connection to the signaling broker drops (network switch,
+    // phone backgrounded, etc.) reconnect automatically instead of
+    // leaving the page stuck with a dead ID.
+    p.on('disconnected', ()=>{
+      console.warn('Desconectado do broker — tentando reconectar em 2s...');
+      document.getElementById('myId').textContent = 'reconectando...';
+      setTimeout(()=>{ if (!p.destroyed) p.reconnect(); }, 2000);
+    });
+    p.on('close', ()=>{
+      console.warn('Conexão com o broker foi encerrada definitivamente.');
+    });
+    return p;
+  }
+
+  const peer = createPeer();
 
   // ---------- tabs ----------
   document.querySelectorAll('.tab').forEach(btn=>{
@@ -721,7 +741,7 @@
 
   let isConnected = false;
 
-  function handleDisconnected(){
+  function handleDisconnected(preserveStatus){
     isConnected = false;
     if (statsTimer){ clearInterval(statsTimer); statsTimer = null; }
     lastBytes = 0; lastTime = 0;
@@ -732,18 +752,20 @@
     document.getElementById('statBitrate').textContent = '—';
     document.getElementById('statRes').textContent = '—';
     document.getElementById('streamStatus').textContent = 'status vídeo: desconectado.';
-    document.getElementById('iceStatus').textContent = 'status ICE: desconectado.';
+    if (!preserveStatus) document.getElementById('iceStatus').textContent = 'status ICE: desconectado.';
     resetConnectBtn();
   }
 
-  function disconnectViewer(){
+  function disconnectViewer(preserveStatus){
     if (currentCall){ try { currentCall.close(); } catch(e){} currentCall = null; }
     if (currentConn){ try { currentConn.close(); } catch(e){} currentConn = null; }
-    handleDisconnected();
+    handleDisconnected(preserveStatus);
   }
 
+  const MAX_ATTEMPTS = 3;
+
   connectBtn.addEventListener('click', ()=>{
-    if (isConnected || connectBtn.textContent === 'CONECTANDO...'){
+    if (isConnected || connectBtn.textContent.startsWith('CONECTANDO') || connectBtn.textContent.startsWith('TENTATIVA')){
       disconnectViewer();
       return;
     }
@@ -751,28 +773,43 @@
     const remoteId = document.getElementById('remoteId').value.trim();
     if (!remoteId) return;
 
+    attemptConnect(remoteId, 1);
+  });
+
+  function attemptConnect(remoteId, attempt){
     if (currentConn){ try { currentConn.close(); } catch(e){} currentConn = null; }
     if (currentCall){ try { currentCall.close(); } catch(e){} currentCall = null; }
 
     connectBtn.disabled = false; // stays clickable so the user can cancel
-    connectBtn.textContent = 'CONECTANDO...';
+    connectBtn.textContent = attempt === 1 ? 'CONECTANDO...' : `TENTATIVA ${attempt}/${MAX_ATTEMPTS}...`;
     const iceStatusEl = document.getElementById('iceStatus');
-    iceStatusEl.textContent = 'status: avisando o transmissor...';
+    iceStatusEl.textContent = `status: avisando o transmissor (tentativa ${attempt}/${MAX_ATTEMPTS})...`;
 
     const conn = peer.connect(remoteId, { reliable: true });
     currentConn = conn;
 
     let dataOpened = false;
+    let settled = false;
+
+    function retryOrGiveUp(reason){
+      if (settled) return;
+      settled = true;
+      if (attempt < MAX_ATTEMPTS){
+        iceStatusEl.textContent = `status: ${reason} — tentando de novo (${attempt+1}/${MAX_ATTEMPTS})...`;
+        setTimeout(()=> attemptConnect(remoteId, attempt + 1), 1500);
+      } else {
+        iceStatusEl.textContent = `status: ${reason} — desistindo após ${MAX_ATTEMPTS} tentativas. Provável bloqueio de rede/firewall.`;
+        disconnectViewer(true);
+      }
+    }
 
     const timeoutId = setTimeout(()=>{
-      if (!dataOpened){
-        iceStatusEl.textContent = 'status: TIMEOUT — não conseguiu nem avisar o transmissor em 15s (provável bloqueio de rede/UDP no seu celular ou operadora).';
-        disconnectViewer();
-      }
+      if (!dataOpened) retryOrGiveUp('TIMEOUT ao avisar o transmissor (15s)');
     }, 15000);
 
     conn.on('open', ()=>{
       dataOpened = true;
+      settled = true;
       clearTimeout(timeoutId);
       iceStatusEl.textContent = 'status: transmissor avisado, aguardando chamada de vídeo...';
     });
@@ -780,12 +817,12 @@
     conn.peerConnection && conn.peerConnection.addEventListener('iceconnectionstatechange', ()=>{
       const state = conn.peerConnection.iceConnectionState;
       console.log('ICE (sinalização) state:', state);
-      if (!dataOpened){
-        iceStatusEl.textContent = 'status: sinalização ICE — ' + state;
+      if (!dataOpened && !settled){
+        iceStatusEl.textContent = `status: sinalização ICE — ${state} (tentativa ${attempt}/${MAX_ATTEMPTS})`;
       }
       if (state === 'failed'){
         clearTimeout(timeoutId);
-        iceStatusEl.textContent = 'status: FALHOU ao avisar o transmissor (ICE da sinalização falhou) — provável bloqueio de rede.';
+        retryOrGiveUp('ICE da sinalização falhou');
       }
     });
 
@@ -795,12 +832,11 @@
       }
     });
     conn.on('error', e => {
-      clearTimeout(timeoutId);
       console.error('Erro ao avisar transmissor:', e);
-      iceStatusEl.textContent = 'status: erro ao conectar — ' + (e && e.message ? e.message : e);
-      handleDisconnected();
+      clearTimeout(timeoutId);
+      retryOrGiveUp('erro na conexão (' + (e && e.message ? e.message : e) + ')');
     });
-  });
+  }
 
   let statsTimer = null;
   let lastBytes = 0, lastTime = 0;
